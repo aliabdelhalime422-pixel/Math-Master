@@ -11,6 +11,7 @@ export default function Calculator() {
   const [displayValue, setDisplayValue] = useState('0');
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [justCalculated, setJustCalculated] = useState(false);
+  const [waitingForNewNumber, setWaitingForNewNumber] = useState(false);
 
   // Evaluate the current expression safely
   const calculateResult = useCallback((expr: string) => {
@@ -50,24 +51,27 @@ export default function Calculator() {
     }
 
     if (/[0-9]/.test(key)) {
-      if (justCalculated) {
+      if (justCalculated || waitingForNewNumber) {
         setDisplayValue(key);
-        setExpression('');
+        if (justCalculated) setExpression('');
         setJustCalculated(false);
+        setWaitingForNewNumber(false);
       } else {
         setDisplayValue(prev => prev === '0' ? key : prev + key);
       }
     } else if (key === '.') {
-      if (justCalculated) {
+      if (justCalculated || waitingForNewNumber) {
         setDisplayValue('0.');
-        setExpression('');
+        if (justCalculated) setExpression('');
         setJustCalculated(false);
+        setWaitingForNewNumber(false);
       } else if (!displayValue.includes('.')) {
         setDisplayValue(prev => prev + '.');
       }
     } else if (['+', '-', '×', '÷'].includes(key)) {
       setJustCalculated(false);
-      if (expression && displayValue === '') {
+      setWaitingForNewNumber(false);
+      if (expression && (displayValue === '' || waitingForNewNumber)) {
         // Change the last operator
         setExpression(prev => prev.trim().slice(0, -1) + ' ' + key + ' ');
       } else {
@@ -75,7 +79,7 @@ export default function Calculator() {
         const nextExpr = (justCalculated ? displayValue : expression + displayValue) + ' ' + key + ' ';
         setExpression(nextExpr);
         if (result && !justCalculated) setDisplayValue(result);
-        else setDisplayValue('');
+        setWaitingForNewNumber(true);
       }
     } else if (key === '=') {
       if (justCalculated || !expression) return;
@@ -87,28 +91,26 @@ export default function Calculator() {
         setDisplayValue(res);
         setExpression(fullExpr + ' =');
         setJustCalculated(true);
+        setWaitingForNewNumber(false);
       }
     } else if (key === 'AC') {
       setDisplayValue('0');
       setExpression('');
       setJustCalculated(false);
+      setWaitingForNewNumber(false);
     } else if (key === '⌫') {
-      if (justCalculated) return;
+      if (justCalculated || waitingForNewNumber) return;
       setDisplayValue(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
     } else if (key === '%') {
-      if (justCalculated) {
-        const val = parseFloat(displayValue) / 100;
-        setDisplayValue(val.toString());
-      } else if (displayValue) {
-        const val = parseFloat(displayValue) / 100;
-        setDisplayValue(val.toString());
-      }
+      const val = parseFloat(displayValue) / 100;
+      setDisplayValue(val.toString());
+      setWaitingForNewNumber(false);
     } else if (key === '+/-') {
       if (displayValue && displayValue !== '0') {
         setDisplayValue(prev => prev.startsWith('-') ? prev.slice(1) : '-' + prev);
       }
     }
-  }, [displayValue, expression, justCalculated, calculateResult]);
+  }, [displayValue, expression, justCalculated, waitingForNewNumber, calculateResult]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
